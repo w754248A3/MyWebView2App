@@ -83,42 +83,34 @@
         .input-group-container {
             flex: 1;
             display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        /* 单个输入框包装 (带X号) */
-        .input-wrapper {
-            position: relative;
-            border: 2px solid #000;
-            display: flex;
             align-items: center;
-            background: #fff;
-            padding-right: 25px; /* 为X留位置 */
-            width: 140px;
+            gap: 15px;
+        }
+
+        /* 表达式输入框 */
+        .expr-input {
+            width: 250px;
             height: 40px;
-        }
-
-        .input-wrapper input {
-            width: 100%;
-            height: 100%;
-            border: none;
-            outline: none;
-            padding: 5px 5px 5px 10px;
-            font-size: 16px;
-        }
-
-        /* 删除按钮 X */
-        .delete-btn {
-            position: absolute;
-            right: 5px;
-            cursor: pointer;
-            font-weight: bold;
+            border: 2px solid #000;
+            padding: 5px 10px;
+            font-size: 18px;
             font-family: monospace;
-            color: #555;
-            user-select: none;
+            outline: none;
         }
-        .delete-btn:hover { color: red; }
+
+        /* 表达式结果显示 */
+        .expr-result-box {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            min-width: 100px;
+        }
+
+        .expr-error {
+            color: #e74c3c;
+            font-size: 14px;
+            font-weight: normal;
+        }
 
         /* 底部区域 (E, F, G) */
         #bottom-area {
@@ -329,10 +321,26 @@
             // D部分: 输入框容器
             const inputContainer = document.createElement('div');
             inputContainer.className = 'input-group-container';
-            inputContainer.dataset.varName = varName; // 绑定变量名方便后续取值
+            inputContainer.dataset.varName = varName;
 
-            // 添加初始的一个输入框
-            addInputBox(inputContainer);
+            // 创建表达式输入框
+            const input = document.createElement('input');
+            input.type = "text";
+            input.className = "expr-input";
+            input.placeholder = "输入表达式, 如 8*4";
+            
+            // 结果显示区域
+            const resultBox = document.createElement('div');
+            resultBox.className = 'expr-result-box';
+            resultBox.textContent = "";
+
+            // 监听输入事件
+            input.addEventListener('input', () => {
+                handleExpressionInput(input, resultBox);
+            });
+
+            inputContainer.appendChild(input);
+            inputContainer.appendChild(resultBox);
 
             row.appendChild(label);
             row.appendChild(inputContainer);
@@ -340,67 +348,83 @@
         });
     }
 
-    // 6. 动态输入框逻辑
-    function addInputBox(container, value = "") {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'input-wrapper';
+    // 6. 表达式计算逻辑
+    function handleExpressionInput(inputEl, resultBoxEl) {
+        const expr = inputEl.value.trim();
+        if (!expr) {
+            resultBoxEl.textContent = "";
+            resultBoxEl.classList.remove('expr-error');
+            inputEl.dataset.calculatedValue = "0";
+            return;
+        }
 
-        const input = document.createElement('input');
-        input.type = "number";
-        input.placeholder = "0";
-        input.value = value;
-        
-        // 监听输入事件：如果是最后一个且有值，新增一个
-        input.addEventListener('input', function() {
-            const allWrappers = container.querySelectorAll('.input-wrapper');
-            const isLast = allWrappers[allWrappers.length - 1] === wrapper;
+        // 安全性检查：只允许 数字 . + - * / ( )
+        // 允许空格
+        const safeExpr = expr.replace(/\s+/g, '');
+        if (!/^[0-9.+\-*/()]+$/.test(safeExpr)) {
+            resultBoxEl.textContent = "格式错误";
+            resultBoxEl.classList.add('expr-error');
+            inputEl.dataset.calculatedValue = "NaN";
+            return;
+        }
+
+        try {
+            // 使用 new Function 计算
+            const res = new Function('return ' + safeExpr)();
             
-            if (isLast && this.value.trim() !== "") {
-                addInputBox(container);
+            if (typeof res === 'number' && !isNaN(res) && isFinite(res)) {
+                let displayRes = res;
+                if (!Number.isInteger(res)) {
+                    displayRes = parseFloat(res.toFixed(4));
+                }
+                resultBoxEl.textContent = "= " + displayRes;
+                resultBoxEl.classList.remove('expr-error');
+                inputEl.dataset.calculatedValue = res.toString();
+            } else {
+                resultBoxEl.textContent = "错误";
+                resultBoxEl.classList.add('expr-error');
+                inputEl.dataset.calculatedValue = "NaN";
             }
-        });
-
-        const deleteBtn = document.createElement('span');
-        deleteBtn.className = 'delete-btn';
-        deleteBtn.textContent = '×'; // 或者 'X'
-        deleteBtn.onclick = function() {
-            const allWrappers = container.querySelectorAll('.input-wrapper');
-            // 如果只有一行，清空但不删除
-            if (allWrappers.length === 1) {
-                input.value = "";
-                return;
-            }
-            // 删除当前
-            container.removeChild(wrapper);
-        };
-
-        wrapper.appendChild(input);
-        wrapper.appendChild(deleteBtn);
-        container.appendChild(wrapper);
+        } catch (e) {
+            resultBoxEl.textContent = "语法错误";
+            resultBoxEl.classList.add('expr-error');
+            inputEl.dataset.calculatedValue = "NaN";
+        }
     }
 
     // 7. 核心计算逻辑
     function performCalculation() {
         if (!currentFormulaRaw || currentVariables.length === 0) return;
 
-        // 1. 获取所有变量的值（求和）
+        // 1. 获取所有变量的值
         const varValues = {};
         const rows = scrollAreaEl.querySelectorAll('.variable-row');
+        let hasError = false;
         
         rows.forEach(row => {
-            const varName = row.querySelector('.input-group-container').dataset.varName;
-            const inputs = row.querySelectorAll('input');
-            let sum = 0;
-            inputs.forEach(inp => {
-                const val = parseFloat(inp.value);
-                if (!isNaN(val)) {
-                    sum += val;
-                }
-            });
-            // 处理JS浮点数精度问题 (简单的处理)
-            sum = Math.round(sum * 10000) / 10000;
-            varValues[varName] = sum;
+            const inputContainer = row.querySelector('.input-group-container');
+            const varName = inputContainer.dataset.varName;
+            const input = inputContainer.querySelector('input');
+            
+            // 如果输入框为空，默认为 0
+            if (!input.value.trim()) {
+                varValues[varName] = 0;
+                return;
+            }
+
+            const val = parseFloat(input.dataset.calculatedValue);
+            if (isNaN(val)) {
+                hasError = true;
+            } else {
+                varValues[varName] = val;
+            }
         });
+
+        if (hasError) {
+            resultDisplayEl.textContent = "输入有误";
+            substitutedDisplayEl.textContent = "请检查变量输入中的表达式错误";
+            return;
+        }
 
         // 2. 代入公式 (E部分)
         // 必须通过 Token 拆分来替换，否则 "Total" 会匹配并替换掉 "TotalCost" 中的前缀

@@ -22,7 +22,7 @@ coverage
 /cypress/screenshots/
 
 Assets/
-
+.trae/
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
