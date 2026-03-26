@@ -476,6 +476,20 @@
         }
     }
 
+
+    document.addEventListener('copy', function(e) {
+        // 阻止默认的复制行为（默认会带样式）
+        e.preventDefault();
+
+        // 获取纯文本（不带任何 HTML/样式）
+        const text = window.getSelection().toString();
+        if(text){
+            navigator.clipboard.writeText(text);
+        }
+
+        
+    });
+
     (async function(){
 
         const res = await fetch("/data/data.json");
