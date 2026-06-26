@@ -270,8 +270,8 @@ function parseTimeString(str) {
   }
 
   // 定义两种格式的正则表达式
-  var fullPattern = /^(\d{4})\/(\d{2})\/(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
-  var datePattern = /^(\d{4})\/(\d{2})\/(\d{2})$/;
+  var fullPattern = /^(\d{4})[-\/](\d{2})[-\/](\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
+  var datePattern = /^(\d{4})[-\/](\d{2})[-\/](\d{2})$/;
 
   var year, month, day, hours, minutes, seconds;
 
